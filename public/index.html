@@ -1,0 +1,34 @@
+#i know it look ugly xd
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Music from Spotify</title>
+</head>
+<body>
+    <h1>Download Music from Spotify</h1>
+    <form id="downloadForm">
+        <label for="link">Spotify Track Link:</label>
+        <input type="text" id="link" name="link" required>
+        <button type="submit">Download</button>
+    </form>
+    <div id="message"></div>
+    
+    <script>
+        document.getElementById('downloadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const link = document.getElementById('link').value;
+            const response = await fetch('/download', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ link })
+            });
+            const message = await response.text();
+            document.getElementById('message').innerText = message;
+        });
+    </script>
+</body>
+</html>
