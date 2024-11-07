@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #f3f4f6;
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 2rem;
+            color: #fff;
+        }
+
+        .app-container {
+            width: 90%;
+            max-width: 500px;
+            padding: 20px;
+            background-color: #2d2f3b;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        #searchBar {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            color: #f3f4f6; 
+            background-color: #3b3f52; 
+        }
+
+        .track-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .track {
+            padding: 10px 15px;
+            border-radius: 8px;
+            background-color: #3b3f52;
+            margin-bottom: 8px;
+            color: #f3f4f6;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .track:hover {
+            background-color: #4b4f62;
+        }
+
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 20px;
+            background-color: #3b3f52;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        #playPauseBtn, #muteBtn, #loopBtn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #fff;
+            cursor: pointer;
+        }
+        #seekSlider, #volumeSlider {
+            flex-grow: 1;
+            margin: 0 10px;
+        }
+        #seekSlider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 5px;
+            background: #666;
+            border-radius: 5px;
+            outline: none;
+        }
+        #volumeSlider {
+            width: 50px;
+        }
+        #currentSong {
+            margin-top: 20px;
+            color: #fff;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <h2>Music Player</h2>
+        <input type="text" id="searchBar" placeholder="🔍 Search for a track...">
+        
+        <ul id="trackList" class="track-list"></ul>
+
+        <div class="audio-controls">
+            <button id="playPauseBtn">▶️</button>
+            <input type="range" id="seekSlider" value="0" max="100">
+            <span id="currentTime">0:00</span> / <span id="duration">0:00</span>
+            <button id="muteBtn">🔈</button>
+            <input type="range" id="volumeSlider" min="0" max="100" value="50">
+            <button id="loopBtn">🔁</button>
+        </div>
+        
+        <div id="currentSong">Currently playing: <span id="songTitle">None</span></div>
+    </div>
+
+    <audio id="audioPlayer" controls style="display:none;"></audio>
+
+    <script>
+        let isLooping = false;
+
+        const audioPlayer = document.getElementById('audioPlayer');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const muteBtn = document.getElementById('muteBtn');
+        const seekSlider = document.getElementById('seekSlider');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const currentTimeEl = document.getElementById('currentTime');
+        const durationEl = document.getElementById('duration');
+        const searchBar = document.getElementById('searchBar');
+        const trackList = document.getElementById('trackList');
+        const loopBtn = document.getElementById('loopBtn');
+        const songTitleEl = document.getElementById('songTitle');
+
+        let isPlaying = false;
+        let tracks = [];
+
+        async function fetchTracks() {
+            try {
+                const response = await fetch('/api/music');
+                tracks = await response.json();
+                displayTracks(tracks);
+            } catch (error) {
+                console.error('Error fetching track list:', error);
+            }
+        }
+
+        function displayTracks(trackArray) {
+            trackList.innerHTML = '';
+            trackArray.forEach(track => {
+                const listItem = document.createElement('li');
+                listItem.className = 'track';
+                listItem.textContent = track;
+                listItem.onclick = () => playTrack(track);
+                trackList.appendChild(listItem);
+            });
+        }
+
+        function togglePlayPause() {
+            if (isPlaying) {
+                audioPlayer.pause();
+                playPauseBtn.textContent = '▶️';
+            } else {
+                audioPlayer.play();
+                playPauseBtn.textContent = '⏸️';
+            }
+            isPlaying = !isPlaying;
+        }
+
+        function playTrack(track) {
+            audioPlayer.src = `/music/${track}`;
+            audioPlayer.play();
+            playPauseBtn.textContent = '⏸️';
+            isPlaying = true;
+            songTitleEl.textContent = track;
+
+            updateDiscordRPC(track);
+        }
+
+        function updateSeekBar() {
+            seekSlider.value = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+            currentTimeEl.textContent = formatTime(audioPlayer.currentTime);
+        }
+
+        function setAudioTime() {
+            audioPlayer.currentTime = (seekSlider.value / 100) * audioPlayer.duration;
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${minutes}:${secs}`;
+        }
+
+        function updateVolume() {
+            audioPlayer.volume = volumeSlider.value / 100;
+            muteBtn.textContent = audioPlayer.volume === 0 ? '🔇' : '🔈';
+        }
+
+        function toggleMute() {
+            audioPlayer.muted = !audioPlayer.muted;
+            muteBtn.textContent = audioPlayer.muted ? '🔇' : '🔈';
+            volumeSlider.value = audioPlayer.muted ? 0 : audioPlayer.volume * 100;
+        }
+
+        function toggleLoop() {
+            isLooping = !isLooping;
+            loopBtn.textContent = isLooping ? '🔁 (Enabled)' : '🔁';
+            audioPlayer.loop = isLooping;
+        }
+
+        searchBar.addEventListener('input', () => {
+            const searchTerm = searchBar.value.toLowerCase();
+            const filteredTracks = tracks.filter(track => track.toLowerCase().includes(searchTerm));
+            displayTracks(filteredTracks);
+        });
+
+        audioPlayer.addEventListener('loadedmetadata', () => {
+            durationEl.textContent = formatTime(audioPlayer.duration);
+        });
+        audioPlayer.addEventListener('timeupdate', updateSeekBar);
+        seekSlider.addEventListener('input', setAudioTime);
+        volumeSlider.addEventListener('input', updateVolume);
+        playPauseBtn.addEventListener('click', togglePlayPause);
+        muteBtn.addEventListener('click', toggleMute);
+        loopBtn.addEventListener('click', toggleLoop);
+
+        fetchTracks();
+
+        function updateDiscordRPC(track) {
+            fetch('/update-discord-rpc', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ track: track })
+            });
+        }
+    </script>
+</body>
+</html>
